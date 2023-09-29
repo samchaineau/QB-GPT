@@ -1,0 +1,8 @@
+*.csv
+*.json
+*.parquet
+*.data-00000-of-00001
+data_models/test_play_prediction_binary/7530764499300901117/00000000.shard/00000000.snapshot
+*.snapshot
+*.pb
+*.metadata

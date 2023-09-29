@@ -1,2 +1,3 @@
 # QB-GPT
- Core repository for QB-GPT model
+
+This project contains the code and materials related to QB-GPT models, framework and process.
