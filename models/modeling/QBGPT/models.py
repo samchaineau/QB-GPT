@@ -1,5 +1,6 @@
 import tensorflow as tf
 from typing import List, Optional, Union
+import numpy as np
 
 def shape_list(tensor: Union[tf.Tensor, np.ndarray]) -> List[int]:
     """
