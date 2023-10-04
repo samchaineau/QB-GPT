@@ -179,16 +179,17 @@ class AttentionBlock(tf.keras.Model):
         self.attention_head_size = hidden_dim
         self.total_dim = num_heads * hidden_dim
         self.output_dim = output_dim
-
+        
+        self.NormIn = tf.keras.layers.LayerNormalization(name = "Norm_in")
         self.Query = tf.keras.layers.Dense(self.total_dim, name = "Query")
         self.Key = tf.keras.layers.Dense(self.total_dim, name = "Key")
         self.Value = tf.keras.layers.Dense(self.total_dim, name = "Value")
-
-
-        self.Dense = tf.keras.layers.Dense(output_dim, name = "Dense", activation = "relu")
+        self.DenseAtt = tf.keras.layers.Dense(output_dim, name = "Dense", activation = "relu")
+        
         self.Add = tf.keras.layers.Add(name = "Add")
         self.Drop = tf.keras.layers.Dropout(rate = 0.1)
-        self.Norm = tf.keras.layers.BatchNormalization(name = "Norm")
+        self.DenseOut = tf.keras.layers.Dense(output_dim, name = "Dense", activation = "relu")
+        self.NormOut = tf.keras.layers.LayerNormalization(name = "Norm_out")
 
   def transpose_for_scores(self, tensor: tf.Tensor, batch_size: int) -> tf.Tensor:
         # Reshape from [batch_size, seq_length, all_head_size] to [batch_size, seq_length, num_attention_heads, attention_head_size]
@@ -255,14 +256,16 @@ class AttentionBlock(tf.keras.Model):
            attention_masks):
 
     batch_size = shape_list(hidden_states)[0]
-
-    query = self.Query(hidden_states)
+    
+    norm_hidden_states = self.NormIn(hidden_states)
+    
+    query = self.Query(norm_hidden_states)
     queries = self.transpose_for_scores(query, batch_size)
 
-    key = self.Key(hidden_states)
+    key = self.Key(norm_hidden_states)
     keys = self.transpose_for_scores(key, batch_size)
 
-    value = self.Value(hidden_states)
+    value = self.Value(norm_hidden_states)
     values = self.transpose_for_scores(value, batch_size)
 
     attention_weights = self.compute_attention_weigths(queries, keys, temporal_ids, attention_masks)
@@ -270,12 +273,15 @@ class AttentionBlock(tf.keras.Model):
     attention_scores = tf.matmul(attention_weights, values)
     attention_scores = tf.transpose(attention_scores, perm=[0, 2, 1, 3])
     attention_scores = tf.reshape(tensor=attention_scores, shape=(batch_size, -1, self.total_dim))
-
-    attention_scores = self.Dense(attention_scores)
-
-    output = self.Add([attention_scores, hidden_states])
+    attention_scores = self.DenseAtt(attention_scores)
+    output = self.Add([attention_scores, norm_hidden_states])
+    
+    norm_output = self.NormOut(output)
+    densed_output = self.DenseOut(norm_output)
+    
+    output = self.Add([densed_output, output])
+    
     output = self.Drop(output)
-    output = self.Norm(output)
     return output
 
 class Encoder(tf.keras.Model):
