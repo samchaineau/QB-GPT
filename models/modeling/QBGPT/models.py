@@ -184,7 +184,6 @@ class AttentionBlock(tf.keras.Model):
         self.Query = tf.keras.layers.Dense(self.total_dim, name = "Query")
         self.Key = tf.keras.layers.Dense(self.total_dim, name = "Key")
         self.Value = tf.keras.layers.Dense(self.total_dim, name = "Value")
-        self.DenseAtt = tf.keras.layers.Dense(output_dim, name = "Dense", activation = "relu")
         
         self.Add = tf.keras.layers.Add(name = "Add")
         self.Drop = tf.keras.layers.Dropout(rate = 0.1)
@@ -256,7 +255,6 @@ class AttentionBlock(tf.keras.Model):
            attention_masks):
 
     batch_size = shape_list(hidden_states)[0]
-    
     norm_hidden_states = self.NormIn(hidden_states)
     
     query = self.Query(norm_hidden_states)
@@ -273,7 +271,6 @@ class AttentionBlock(tf.keras.Model):
     attention_scores = tf.matmul(attention_weights, values)
     attention_scores = tf.transpose(attention_scores, perm=[0, 2, 1, 3])
     attention_scores = tf.reshape(tensor=attention_scores, shape=(batch_size, -1, self.total_dim))
-    
     
     attention_scores = self.DenseAtt(attention_scores)
     output = self.Add([attention_scores, norm_hidden_states])
@@ -350,7 +347,6 @@ class AttentionBlockHelenos(tf.keras.Model):
     attention_scores = tf.matmul(attention_weights, values)
     attention_scores = tf.transpose(attention_scores, perm=[0, 2, 1, 3])
     attention_scores = tf.reshape(tensor=attention_scores, shape=(batch_size, -1, self.total_dim))
-    attention_scores = self.DenseAtt(attention_scores)
     
     output = self.Add([attention_scores, norm_hidden_states_v])
     

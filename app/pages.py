@@ -47,9 +47,7 @@ def qb_gpt_page():
             st.write("Generate button clicked!")
             
     col1, col2 = st.columns(2)
-    
     players = []
-
     # Defense Inputs
     with col1:
         st.header("Defense")
