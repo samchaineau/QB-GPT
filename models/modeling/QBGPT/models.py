@@ -181,6 +181,8 @@ class Transformers(tf.keras.Model):
         self.Key = tf.keras.layers.Dense(self.total_dim, name = "Key", use_bias = False)
         self.Value = tf.keras.layers.Dense(self.total_dim, name = "Value", use_bias = False)
         
+        self.DenseAtt = tf.keras.layers.Dense(hidden_dim, activation = "relu", use_bias = False)
+        
         self.Add = tf.keras.layers.Add(name = "Add")
         self.Drop = tf.keras.layers.Dropout(rate = 0.1)
         
@@ -268,6 +270,7 @@ class Transformers(tf.keras.Model):
     attention_scores = tf.matmul(attention_weights, values)
     attention_scores = tf.transpose(attention_scores, perm=[0, 2, 1, 3])
     attention_scores = tf.reshape(tensor=attention_scores, shape=(batch_size, -1, self.total_dim))
+    attention_scores = self.DenseAtt(attention_scores)
     
     output = self.Add([attention_scores, hidden_states])
     norm_output = self.NormOut(output)
