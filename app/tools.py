@@ -9,26 +9,32 @@ class tokenizer:
                  starts_index : str,
                  time_index : str):
         
-        self.moves_index = pl.read_parquet(moves_index)
-        self.moves_index = self.convert_index_to_dict(self.moves_index)
+        moves_index = pl.read_parquet(moves_index)
+        self.moves_index = self.convert_index_to_dict(moves_index)
         
-        self.play_index = pl.read_parquet(play_index)
-        self.play_index= self.convert_index_to_dict(self.play_index)
+        play_index = pl.read_parquet(play_index)
+        self.play_index= self.convert_index_to_dict(play_index)
         
-        self.positions_index = pl.read_parquet(positions_index)
-        self.positions_index = self.convert_index_to_dict(self.positions_index)
+        positions_index = pl.read_parquet(positions_index)
+        self.positions_index = self.convert_index_to_dict(positions_index)
         
-        self.scrimmage_index = pl.read_parquet(scrimmage_index)
-        self.scrimmage_index = self.convert_index_to_dict(self.scrimmage_index)
+        scrimmage_index = pl.read_parquet(scrimmage_index)
+        self.scrimmage_index = self.convert_index_to_dict(scrimmage_index)
         
-        self.starts_index = pl.read_parquet(starts_index)
-        self.starts_index = self.convert_index_to_dict(self.starts_index)
+        starts_index = pl.read_parquet(starts_index)
+        self.starts_index = self.convert_index_to_dict(starts_index)
         
-        self.time_index = pl.read_parquet(time_index)
-        self.time_index = self.convert_index_to_dict(self.time_index)
+        time_index = pl.read_parquet(time_index)
+        self.time_index = self.convert_index_to_dict(time_index)
         
-    @staticmethod
-    def convert_index_to_dict(df : pl.DataFrame):
+        self.index = {"moves" : self.moves_index,
+                      "plays" : self.play_index,
+                      "positions" : self.positions_index,
+                      "scrimmage" : self.scrimmage_index,
+                      "starts" : self.starts_index,
+                      "time" : self.time_index}
+    
+    def convert_index_to_dict(self, df : pl.DataFrame):
     
         ID_col = [v for v in df.columns if "ID" in v]
         assert len(ID_col) == 1
@@ -52,17 +58,16 @@ class tokenizer:
 
         return final_d
     
-    @staticmethod
-    def _decode(inputs : list,
-                index : dict):
-        return [index[v] for v in inputs]
+    def base_decode(self,
+                    inputs : list,
+                    index : dict):
+        return [index[v] if v in index.keys() else "[PAD]" for v in inputs]
     
-    def decode(inputs : list,
-                index : dict):
-        return _decode(inputs = inputs,
-                       index = index)
+    def decode(self,
+               inputs : list,
+               type : str):
+        return self.base_decode(inputs, index = self.index[type])
     
-    @staticmethod
     def find_id_by_values(input_dict : dict, 
                           target_list : list):
         
@@ -70,11 +75,12 @@ class tokenizer:
             if set(target_list) == set(values):
                 return key
         
-    def _encode(self,
+    def base_encode(self,
                 inputs : list,
                 index : dict):
         return [self.find_id_by_values(index, v) for v in inputs]
     
-    
-    
-    
+    def encode(self,
+               inputs : list,
+               type : str):
+        return self.base_encode(inputs, index = self.index[type])
