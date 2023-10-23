@@ -164,12 +164,12 @@ class Embedding(tf.keras.Model):
 
     return embed
 
-class AttentionBlock(tf.keras.Model):
+class Transformers(tf.keras.Model):
   def __init__(self,
                num_heads : int,
                hidden_dim : int,
                output_dim : int):
-        super(AttentionBlock, self).__init__()
+        super(Transformers, self).__init__()
 
         self.num_attention_heads = num_heads
         self.attention_head_size = hidden_dim
@@ -265,94 +265,15 @@ class AttentionBlock(tf.keras.Model):
     values = self.transpose_for_scores(value, batch_size)
 
     attention_weights = self.compute_attention_weigths(queries, keys, temporal_ids, attention_masks)
-
     attention_scores = tf.matmul(attention_weights, values)
     attention_scores = tf.transpose(attention_scores, perm=[0, 2, 1, 3])
     attention_scores = tf.reshape(tensor=attention_scores, shape=(batch_size, -1, self.total_dim))
     
-    output = self.Add([attention_scores, norm_hidden_states])
-    
+    output = self.Add([attention_scores, hidden_states])
     norm_output = self.NormOut(output)
+    
     densed_output = self.DenseOut(norm_output)
-    
     output = self.Add([densed_output, output])
-    
-    output = self.Drop(output)
-    return output
-  
-class AttentionBlockHelenos(tf.keras.Model):
-  def __init__(self,
-               num_heads : int,
-               hidden_dim : int,
-               output_dim : int):
-        super(AttentionBlockHelenos, self).__init__()
-
-        self.num_attention_heads = num_heads
-        self.attention_head_size = hidden_dim
-        self.total_dim = num_heads * hidden_dim
-        self.output_dim = output_dim
-        
-        self.NormIn = tf.keras.layers.LayerNormalization(name = "Norm_in")
-        self.Query = tf.keras.layers.Dense(self.total_dim, name = "Query")
-        self.Key = tf.keras.layers.Dense(self.total_dim, name = "Key")
-        self.Value = tf.keras.layers.Dense(self.total_dim, name = "Value")
-        self.DenseAtt = tf.keras.layers.Dense(output_dim, name = "Dense", activation = "relu")
-        
-        self.Add = tf.keras.layers.Add(name = "Add")
-        self.Drop = tf.keras.layers.Dropout(rate = 0.1)
-        self.DenseOut = tf.keras.layers.Dense(output_dim, name = "Dense", activation = "relu")
-        self.NormOut = tf.keras.layers.LayerNormalization(name = "Norm_out")
-
-  def transpose_for_scores(self, tensor: tf.Tensor, batch_size: int) -> tf.Tensor:
-        # Reshape from [batch_size, seq_length, all_head_size] to [batch_size, seq_length, num_attention_heads, attention_head_size]
-        tensor = tf.reshape(tensor=tensor, shape=(batch_size, -1, self.num_attention_heads, self.attention_head_size))
-
-        # Transpose the tensor from [batch_size, seq_length, num_attention_heads, attention_head_size] to [batch_size, num_attention_heads, seq_length, attention_head_size]
-        return tf.transpose(tensor, perm=[0, 2, 1, 3])
-
-  def compute_scaled_attn_scores(self, query, key):
-    attention_scores = tf.matmul(query, key, transpose_b=True)  # Transpose the second sequence
-
-    # If you want scaled dot-product attention, divide by the square root of the embedding dimension
-    embedding_dim = query.shape[-1]
-    scaled_attention_scores = attention_scores / tf.math.sqrt(tf.cast(embedding_dim, dtype=tf.float32))
-
-    return scaled_attention_scores
-
-  def call(self,
-           q : tf.Tensor,
-           k : tf.Tensor,
-           v : tf.Tensor):
-
-    batch_size = shape_list(q)[0]
-    
-    norm_hidden_states_q = self.NormIn(q)
-    norm_hidden_states_k = self.NormIn(k)
-    norm_hidden_states_v = self.NormIn(v)
-    
-    query = self.Query(norm_hidden_states_q)
-    queries = self.transpose_for_scores(query, batch_size)
-
-    key = self.Key(norm_hidden_states_k)
-    keys = self.transpose_for_scores(key, batch_size)
-    
-    value = self.Key(norm_hidden_states_v)
-    values = self.transpose_for_scores(value, batch_size)
-    
-    attention_weights = self.compute_scaled_attn_scores(queries, keys)
-    
-    attention_scores = tf.matmul(attention_weights, values)
-    attention_scores = tf.transpose(attention_scores, perm=[0, 2, 1, 3])
-    attention_scores = tf.reshape(tensor=attention_scores, shape=(batch_size, -1, self.total_dim))
-    attention_scores = self.DenseAtt(attention_scores)
-    
-    output = self.Add([attention_scores, norm_hidden_states_v])
-    
-    norm_output = self.NormOut(output)
-    densed_output = self.DenseOut(norm_output)
-    
-    output = self.Add([densed_output, output])
-    
     output = self.Drop(output)
     return output
 
@@ -380,7 +301,7 @@ class Encoder(tf.keras.Model):
                                    playtype_vocab_size = playtype_vocab_size,
                                    embedding_dim = embedding_dim)
 
-        self.Attention1 = AttentionBlock(num_heads = 3,
+        self.Attention1 = Transformers(num_heads = 3,
                                          hidden_dim = hidden_dim,
                                          output_dim = embedding_dim)
 
@@ -420,10 +341,10 @@ class EncoderL(tf.keras.Model):
                                    playtype_vocab_size = playtype_vocab_size,
                                    embedding_dim = embedding_dim)
 
-        self.Attention1 = AttentionBlock(num_heads = 3,
+        self.Attention1 = Transformers(num_heads = 3,
                                          hidden_dim = hidden_dim,
                                          output_dim = embedding_dim)
-        self.Attention2 = AttentionBlock(num_heads = 3,
+        self.Attention2 = Transformers(num_heads = 3,
                                          hidden_dim = hidden_dim,
                                          output_dim = embedding_dim)
 
@@ -464,13 +385,13 @@ class EncoderXL(tf.keras.Model):
                                    playtype_vocab_size = playtype_vocab_size,
                                    embedding_dim = embedding_dim)
 
-        self.Attention1 = AttentionBlock(num_heads = 3,
+        self.Attention1 = Transformers(num_heads = 3,
                                          hidden_dim = hidden_dim,
                                          output_dim = embedding_dim)
-        self.Attention2 = AttentionBlock(num_heads = 3,
+        self.Attention2 = Transformers(num_heads = 3,
                                          hidden_dim = hidden_dim,
                                          output_dim = embedding_dim)
-        self.Attention3 = AttentionBlock(num_heads = 3,
+        self.Attention3 = Transformers(num_heads = 3,
                                          hidden_dim = hidden_dim,
                                          output_dim = embedding_dim)
 
