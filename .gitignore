@@ -6,3 +6,4 @@ data_models/test_play_prediction_binary/7530764499300901117/00000000.shard/00000
 *.snapshot
 *.pb
 *.metadata
+*.lance

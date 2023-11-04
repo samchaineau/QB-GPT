@@ -226,7 +226,7 @@ class Transformers(tf.keras.Model):
     causal_masks = self.create_causal_masks(temp_ids)
     scaled_attn_scores = self.compute_scaled_attn_scores(query, key)
 
-    attn_scores = scaled_attn_scores - attn_masks - causal_masks
+    attn_scores = scaled_attn_scores + attn_masks + causal_masks
     return tf.nn.softmax(attn_scores, axis = -1)
 
   def get_preds_and_attention(self,

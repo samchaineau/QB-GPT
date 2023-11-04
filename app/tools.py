@@ -68,7 +68,8 @@ class tokenizer:
                type : str):
         return self.base_decode(inputs, index = self.index[type])
     
-    def find_id_by_values(input_dict : dict, 
+    def find_id_by_values(self, 
+                          input_dict : dict, 
                           target_list : list):
         
         for key, values in input_dict.items():
@@ -84,3 +85,4 @@ class tokenizer:
                inputs : list,
                type : str):
         return self.base_encode(inputs, index = self.index[type])
+        
