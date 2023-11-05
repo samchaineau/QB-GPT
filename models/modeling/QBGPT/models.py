@@ -199,13 +199,18 @@ class Transformers(tf.keras.Model):
   def create_causal_masks(self, temp_ids):
       # Use broadcasting to create the 2D comparison tensor
       causal_mask = temp_ids[:, :, tf.newaxis] >= temp_ids[:, tf.newaxis, :]
-      causal_mask = (tf.cast(causal_mask, dtype=tf.float32) - 1) * 10000
+      causal_mask = (tf.cast(causal_mask, dtype=tf.float32) - 1) * 1000000
       reshaped_tensor = tf.expand_dims(causal_mask, axis=1)
       duplicated_tensor = tf.tile(reshaped_tensor, multiples=[1, 3, 1, 1])
       return duplicated_tensor
+    
+  def create_diag_masks(self, hidden_state):
+    dims = shape_list(hidden_state)
+    matrix = tf.linalg.diag(tf.ones((dims[0], dims[1], dims[2]), dtype=tf.float32))
+    return matrix*-1000000
 
   def create_attention_mask(self, attn_mask):
-    attn_mask = (tf.cast(attn_mask, dtype=tf.float32) -1) * 10000
+    attn_mask = (tf.cast(attn_mask, dtype=tf.float32) -1) * 1000000
     reshaped_tensor = tf.expand_dims(attn_mask, axis=1)
     reshaped_tensor = tf.expand_dims(reshaped_tensor, axis=1)
     duplicated_tensor = tf.tile(reshaped_tensor, multiples=[1, 3, 1, 1])
@@ -225,8 +230,9 @@ class Transformers(tf.keras.Model):
     attn_masks = self.create_attention_mask(masks)
     causal_masks = self.create_causal_masks(temp_ids)
     scaled_attn_scores = self.compute_scaled_attn_scores(query, key)
+    diag_masks = self.create_diag_masks(query)
 
-    attn_scores = scaled_attn_scores + attn_masks + causal_masks
+    attn_scores = scaled_attn_scores + attn_masks + causal_masks + diag_masks
     return tf.nn.softmax(attn_scores, axis = -1)
 
   def get_preds_and_attention(self,
