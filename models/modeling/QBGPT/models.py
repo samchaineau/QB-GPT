@@ -236,7 +236,7 @@ class Transformers(tf.keras.Model):
       diag_masks = self.create_diag_masks(query)
       attn_scores = scaled_attn_scores + attn_masks + causal_masks + diag_masks
     else:
-      attn_scores = scaled_attn_scores + attn_masks + causal_masks + diag_masks
+      attn_scores = scaled_attn_scores + attn_masks + causal_masks
       
     return tf.nn.softmax(attn_scores, axis = -1)
 
