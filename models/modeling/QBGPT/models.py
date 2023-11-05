@@ -324,13 +324,17 @@ class Encoder(tf.keras.Model):
                                        output_dim = embedding_dim, 
                                        diag_masks = self.diag_masks)
 
+        self.DenseHead = tf.keras.layers.Dense(embedding_dim, activation = "relu")
+
   def call(self,
            x):
 
     embed = self.Embedding(x)
     h1 = self.Attention1(embed, x["pos_ids"], x["attention_mask"])
 
-    return h1
+    encoded = self.DenseHead(h1)
+
+    return encoded
 
 class EncoderL(tf.keras.Model):
   def __init__(self,
@@ -369,6 +373,8 @@ class EncoderL(tf.keras.Model):
                                        output_dim = embedding_dim, 
                                        diag_masks = self.diag_masks)
 
+        self.DenseHead = tf.keras.layers.Dense(embedding_dim, activation = "relu")
+
   def call(self,
            x):
 
@@ -376,7 +382,9 @@ class EncoderL(tf.keras.Model):
     h1 = self.Attention1(embed, x["pos_ids"], x["attention_mask"])
     h2 = self.Attention2(h1, x["pos_ids"], x["attention_mask"])
 
-    return h2
+    encoded = self.DenseHead(h2)
+
+    return encoded
 
 class EncoderXL(tf.keras.Model):
   def __init__(self,
@@ -419,6 +427,8 @@ class EncoderXL(tf.keras.Model):
                                        output_dim = embedding_dim, 
                                        diag_masks = self.diag_masks)
 
+        self.DenseHead = tf.keras.layers.Dense(embedding_dim, activation = "relu")
+
   def call(self,
            x):
 
@@ -427,7 +437,9 @@ class EncoderXL(tf.keras.Model):
     h2 = self.Attention2(h1, x["pos_ids"], x["attention_mask"])
     h3 = self.Attention3(h2, x["pos_ids"], x["attention_mask"])
 
-    return h3
+    encoded = self.DenseHead(h3)
+
+    return encoded
 
 class QBGPT(tf.keras.Model):
   def __init__(self,
@@ -459,7 +471,7 @@ class QBGPT(tf.keras.Model):
                                num_heads = num_heads,
                                diag_masks = diag_masks)
 
-        self.Logits = tf.keras.layers.Dense(to_pred_size, activation = "relu")
+        self.Logits = tf.keras.layers.Dense(to_pred_size)
 
   def call(self, x):
 
@@ -498,7 +510,7 @@ class LargeQBGPT(tf.keras.Model):
                                num_heads = num_heads,
                                diag_masks = diag_masks)
 
-        self.Logits = tf.keras.layers.Dense(to_pred_size, activation = "relu")
+        self.Logits = tf.keras.layers.Dense(to_pred_size)
 
   def call(self, x):
 
@@ -533,11 +545,9 @@ class XLargeQBGPT(tf.keras.Model):
                                offdef_vocab_size = offdef_vocab_size,
                                playtype_vocab_size = playtype_vocab_size,
                                embedding_dim = embedding_dim,
-                               hidden_dim = hidden_dim,
-                               num_heads = num_heads,
-                               diag_masks = diag_masks)
+                               hidden_dim = hidden_dim)
 
-        self.Logits = tf.keras.layers.Dense(to_pred_size, activation = "relu")
+        self.Logits = tf.keras.layers.Dense(to_pred_size)
 
   def call(self, x):
 
