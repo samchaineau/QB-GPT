@@ -168,9 +168,11 @@ class Transformers(tf.keras.Model):
   def __init__(self,
                num_heads : int,
                hidden_dim : int,
-               output_dim : int):
+               output_dim : int,
+               diag_masks : bool):
         super(Transformers, self).__init__()
-
+        
+        self.diag_masks = diag_masks
         self.num_attention_heads = num_heads
         self.attention_head_size = hidden_dim
         self.total_dim = num_heads * hidden_dim
@@ -201,7 +203,7 @@ class Transformers(tf.keras.Model):
       causal_mask = temp_ids[:, :, tf.newaxis] >= temp_ids[:, tf.newaxis, :]
       causal_mask = (tf.cast(causal_mask, dtype=tf.float32) - 1) * 1000000
       reshaped_tensor = tf.expand_dims(causal_mask, axis=1)
-      duplicated_tensor = tf.tile(reshaped_tensor, multiples=[1, 3, 1, 1])
+      duplicated_tensor = tf.tile(reshaped_tensor, multiples=[1, self.num_attention_heads, 1, 1])
       return duplicated_tensor
     
   def create_diag_masks(self, hidden_state):
@@ -213,7 +215,7 @@ class Transformers(tf.keras.Model):
     attn_mask = (tf.cast(attn_mask, dtype=tf.float32) -1) * 1000000
     reshaped_tensor = tf.expand_dims(attn_mask, axis=1)
     reshaped_tensor = tf.expand_dims(reshaped_tensor, axis=1)
-    duplicated_tensor = tf.tile(reshaped_tensor, multiples=[1, 3, 1, 1])
+    duplicated_tensor = tf.tile(reshaped_tensor, multiples=[1, self.num_attention_heads, 1, 1])
     return duplicated_tensor
 
   def compute_scaled_attn_scores(self, query, key):
@@ -230,9 +232,12 @@ class Transformers(tf.keras.Model):
     attn_masks = self.create_attention_mask(masks)
     causal_masks = self.create_causal_masks(temp_ids)
     scaled_attn_scores = self.compute_scaled_attn_scores(query, key)
-    diag_masks = self.create_diag_masks(query)
-
-    attn_scores = scaled_attn_scores + attn_masks + causal_masks + diag_masks
+    if self.diag_masks == True:
+      diag_masks = self.create_diag_masks(query)
+      attn_scores = scaled_attn_scores + attn_masks + causal_masks + diag_masks
+    else:
+      attn_scores = scaled_attn_scores + attn_masks + causal_masks + diag_masks
+      
     return tf.nn.softmax(attn_scores, axis = -1)
 
   def get_preds_and_attention(self,
@@ -297,9 +302,13 @@ class Encoder(tf.keras.Model):
                type_vocab_size : int,
                playtype_vocab_size : int,
                embedding_dim : int,
-               hidden_dim : int):
+               hidden_dim : int,
+               num_heads : int,
+               diag_masks : bool):
         super(Encoder, self).__init__()
-
+        
+        self.num_heads = num_heads
+        self.diag_masks = diag_masks
         self.Embedding = Embedding(input_vocab_size = input_vocab_size,
                                    positional_vocab_size = positional_vocab_size,
                                    position_vocab_size = position_vocab_size,
@@ -310,11 +319,10 @@ class Encoder(tf.keras.Model):
                                    playtype_vocab_size = playtype_vocab_size,
                                    embedding_dim = embedding_dim)
 
-        self.Attention1 = Transformers(num_heads = 3,
-                                         hidden_dim = hidden_dim,
-                                         output_dim = embedding_dim)
-
-        self.DenseHead = tf.keras.layers.Dense(embedding_dim, activation = "relu")
+        self.Attention1 = Transformers(num_heads = self.num_heads,
+                                       hidden_dim = hidden_dim,
+                                       output_dim = embedding_dim, 
+                                       diag_masks = self.diag_masks)
 
   def call(self,
            x):
@@ -322,9 +330,7 @@ class Encoder(tf.keras.Model):
     embed = self.Embedding(x)
     h1 = self.Attention1(embed, x["pos_ids"], x["attention_mask"])
 
-    encoded = self.DenseHead(h1)
-
-    return encoded
+    return h1
 
 class EncoderL(tf.keras.Model):
   def __init__(self,
@@ -337,9 +343,13 @@ class EncoderL(tf.keras.Model):
                type_vocab_size : int,
                playtype_vocab_size : int,
                embedding_dim : int,
-               hidden_dim : int):
+               hidden_dim : int,
+               num_heads : int,
+               diag_masks : bool):
         super(EncoderL, self).__init__()
-
+        
+        self.num_heads = num_heads
+        self.diag_masks = diag_masks
         self.Embedding = Embedding(input_vocab_size = input_vocab_size,
                                    positional_vocab_size = positional_vocab_size,
                                    position_vocab_size = position_vocab_size,
@@ -350,14 +360,14 @@ class EncoderL(tf.keras.Model):
                                    playtype_vocab_size = playtype_vocab_size,
                                    embedding_dim = embedding_dim)
 
-        self.Attention1 = Transformers(num_heads = 3,
-                                         hidden_dim = hidden_dim,
-                                         output_dim = embedding_dim)
-        self.Attention2 = Transformers(num_heads = 3,
-                                         hidden_dim = hidden_dim,
-                                         output_dim = embedding_dim)
-
-        self.DenseHead = tf.keras.layers.Dense(embedding_dim, activation = "relu")
+        self.Attention1 = Transformers(num_heads = self.num_heads,
+                                       hidden_dim = hidden_dim,
+                                       output_dim = embedding_dim, 
+                                       diag_masks = self.diag_masks)
+        self.Attention2 = Transformers(num_heads = self.num_heads,
+                                       hidden_dim = hidden_dim,
+                                       output_dim = embedding_dim, 
+                                       diag_masks = self.diag_masks)
 
   def call(self,
            x):
@@ -366,9 +376,7 @@ class EncoderL(tf.keras.Model):
     h1 = self.Attention1(embed, x["pos_ids"], x["attention_mask"])
     h2 = self.Attention2(h1, x["pos_ids"], x["attention_mask"])
 
-    encoded = self.DenseHead(h2)
-
-    return encoded
+    return h2
 
 class EncoderXL(tf.keras.Model):
   def __init__(self,
@@ -381,9 +389,13 @@ class EncoderXL(tf.keras.Model):
                type_vocab_size : int,
                playtype_vocab_size : int,
                embedding_dim : int,
-               hidden_dim : int):
+               hidden_dim : int,
+               num_heads : int,
+               diag_masks : bool):
         super(EncoderXL, self).__init__()
-
+        
+        self.num_heads = num_heads
+        self.diag_masks = diag_masks
         self.Embedding = Embedding(input_vocab_size = input_vocab_size,
                                    positional_vocab_size = positional_vocab_size,
                                    position_vocab_size = position_vocab_size,
@@ -394,17 +406,18 @@ class EncoderXL(tf.keras.Model):
                                    playtype_vocab_size = playtype_vocab_size,
                                    embedding_dim = embedding_dim)
 
-        self.Attention1 = Transformers(num_heads = 3,
-                                         hidden_dim = hidden_dim,
-                                         output_dim = embedding_dim)
-        self.Attention2 = Transformers(num_heads = 3,
-                                         hidden_dim = hidden_dim,
-                                         output_dim = embedding_dim)
-        self.Attention3 = Transformers(num_heads = 3,
-                                         hidden_dim = hidden_dim,
-                                         output_dim = embedding_dim)
-
-        self.DenseHead = tf.keras.layers.Dense(embedding_dim, activation = "relu")
+        self.Attention1 = Transformers(num_heads = self.num_heads,
+                                       hidden_dim = hidden_dim,
+                                       output_dim = embedding_dim, 
+                                       diag_masks = self.diag_masks)
+        self.Attention2 = Transformers(num_heads = self.num_heads,
+                                       hidden_dim = hidden_dim,
+                                       output_dim = embedding_dim, 
+                                       diag_masks = self.diag_masks)
+        self.Attention3 = Transformers(num_heads = self.num_heads,
+                                       hidden_dim = hidden_dim,
+                                       output_dim = embedding_dim, 
+                                       diag_masks = self.diag_masks)
 
   def call(self,
            x):
@@ -414,9 +427,7 @@ class EncoderXL(tf.keras.Model):
     h2 = self.Attention2(h1, x["pos_ids"], x["attention_mask"])
     h3 = self.Attention3(h2, x["pos_ids"], x["attention_mask"])
 
-    encoded = self.DenseHead(h3)
-
-    return encoded
+    return h3
 
 class QBGPT(tf.keras.Model):
   def __init__(self,
@@ -430,6 +441,8 @@ class QBGPT(tf.keras.Model):
                playtype_vocab_size : int,
                embedding_dim : int,
                hidden_dim : int,
+               num_heads : int,
+               diag_masks : bool,
                to_pred_size : int):
         super(QBGPT, self).__init__()
 
@@ -442,9 +455,11 @@ class QBGPT(tf.keras.Model):
                                offdef_vocab_size = offdef_vocab_size,
                                playtype_vocab_size = playtype_vocab_size,
                                embedding_dim = embedding_dim,
-                               hidden_dim = hidden_dim)
+                               hidden_dim = hidden_dim,
+                               num_heads = num_heads,
+                               diag_masks = diag_masks)
 
-        self.Logits = tf.keras.layers.Dense(to_pred_size)
+        self.Logits = tf.keras.layers.Dense(to_pred_size, activation = "relu")
 
   def call(self, x):
 
@@ -465,6 +480,8 @@ class LargeQBGPT(tf.keras.Model):
                playtype_vocab_size : int,
                embedding_dim : int,
                hidden_dim : int,
+               num_heads : int,
+               diag_masks : bool,
                to_pred_size : int):
         super(LargeQBGPT, self).__init__()
 
@@ -477,9 +494,11 @@ class LargeQBGPT(tf.keras.Model):
                                offdef_vocab_size = offdef_vocab_size,
                                playtype_vocab_size = playtype_vocab_size,
                                embedding_dim = embedding_dim,
-                               hidden_dim = hidden_dim)
+                               hidden_dim = hidden_dim,
+                               num_heads = num_heads,
+                               diag_masks = diag_masks)
 
-        self.Logits = tf.keras.layers.Dense(to_pred_size)
+        self.Logits = tf.keras.layers.Dense(to_pred_size, activation = "relu")
 
   def call(self, x):
 
@@ -500,6 +519,8 @@ class XLargeQBGPT(tf.keras.Model):
                playtype_vocab_size : int,
                embedding_dim : int,
                hidden_dim : int,
+               num_heads : int,
+               diag_masks : bool,
                to_pred_size : int):
         super(XLargeQBGPT, self).__init__()
 
@@ -512,9 +533,11 @@ class XLargeQBGPT(tf.keras.Model):
                                offdef_vocab_size = offdef_vocab_size,
                                playtype_vocab_size = playtype_vocab_size,
                                embedding_dim = embedding_dim,
-                               hidden_dim = hidden_dim)
+                               hidden_dim = hidden_dim,
+                               num_heads = num_heads,
+                               diag_masks = diag_masks)
 
-        self.Logits = tf.keras.layers.Dense(to_pred_size)
+        self.Logits = tf.keras.layers.Dense(to_pred_size, activation = "relu")
 
   def call(self, x):
 
