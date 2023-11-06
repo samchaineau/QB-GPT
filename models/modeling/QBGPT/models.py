@@ -471,7 +471,7 @@ class QBGPT(tf.keras.Model):
                                num_heads = num_heads,
                                diag_masks = diag_masks)
 
-        self.Logits = tf.keras.layers.Dense(to_pred_size)
+        self.Logits = tf.keras.layers.Dense(to_pred_size, activation = "relu")
 
   def call(self, x):
 
@@ -510,7 +510,7 @@ class LargeQBGPT(tf.keras.Model):
                                num_heads = num_heads,
                                diag_masks = diag_masks)
 
-        self.Logits = tf.keras.layers.Dense(to_pred_size)
+        self.Logits = tf.keras.layers.Dense(to_pred_size, activation = "relu")
 
   def call(self, x):
 
@@ -547,7 +547,7 @@ class XLargeQBGPT(tf.keras.Model):
                                embedding_dim = embedding_dim,
                                hidden_dim = hidden_dim)
 
-        self.Logits = tf.keras.layers.Dense(to_pred_size)
+        self.Logits = tf.keras.layers.Dense(to_pred_size, activation = "relu")
 
   def call(self, x):
 
