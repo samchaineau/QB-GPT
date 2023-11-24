@@ -1,7 +1,9 @@
 import streamlit as st
-import plotly.graph_objs as go
+import plotly.express as px
+import pandas as pd
 import numpy as np
 from PIL import Image
+from tools import generator
 
 def set_app_title_and_logo():
     st.set_page_config(
@@ -9,223 +11,84 @@ def set_app_title_and_logo():
         page_icon=":rocket:",
         layout="wide",
     )
-    
-def header_menu():
-    header_container = st.container()
-    header_columns = header_container.columns(4)  # Create 4 columns for the buttons
 
-    # Add navigation buttons within the header columns
-    if header_columns[0].button("About", use_container_width=True):
-        page = "About"
-    elif header_columns[1].button("QB-GPT", use_container_width=True):
-        page = "QB-GPT"
-    elif header_columns[2].button("Helenos", use_container_width=True):
-        page = "Helenos"
-    elif header_columns[3].button("Contacts and Disclaimers", use_container_width=True):
-        page = "Contacts and Disclaimers"
-    else:
-        page = "About"    # Set a default page when no button is clicked
+def qb_gpt_page(ref_df, ref, tokenizer, model):
     
-def qb_gpt_page():
+    with st.container():
+        cola, colb = st.columns(2)
+        with cola:
+            selected_gameId = st.selectbox("Select Game ID", ref_df['gameId'].unique())
+            filtered_df1 = ref_df[(ref_df['gameId'] == selected_gameId)]
+        with colb:
+            selected_Play= st.selectbox("Select Play ", filtered_df1['playId'].unique())
+        filtered_df = filtered_df1[(filtered_df1['playId'] == selected_Play)].reset_index(drop ="True")
 
-    # Scrimmage Line Input
-    colinput1, colinput2, colinput3 = st.columns([2, 4, 4])
+        # Display the filtered DataFrame
+        st.write("Filtered Data:")
+        st.dataframe(filtered_df)
     
-    with colinput1:
-        with st.expander("Scrimmage Line"):
-            scrimmage_line = st.number_input("Scrimmage Line (1-99)", min_value=1, max_value=99, value = 50)
     
-    with colinput2:
-        if st.button("Create random play", key="random_play_button", help="Click to create a random play.", use_container_width=True):
-            # Add your action for the "Create random play" button here
-            st.write("Create random play button clicked!")
+    with st.container():
+        col1, col2 = st.columns(2)
+        with col1:
+            temperature = st.slider("Temperature", 1.0, 10.0, 1.5, step = 0.5)
+        with col2:
+            n_select = st.slider("N movements to shortlist", 2, 100, 10, step = 1)
         
-    with colinput3:
-        # Add a button in the bottom left corner of the plot
-        if st.button("Generate", key="generate_button", help="Click to generate something.", use_container_width=True):
-            # Add your action for the "Generate" button here
-            st.write("Generate button clicked!")
-            
-    col1, col2 = st.columns(2)
-    players = []
-    # Defense Inputs
-    with col1:
-        st.header("Defense")
-        with st.expander("Manually define Defense"):
-            play_type_defense = st.selectbox(f"Play Type Defense", ["Choice 1", "Choice 2", "Choice 3"], key = "playtype_def")
-            for i in range(11):
-                st.subheader(f"Player {i+1}")
-                position_x_y_defense = st.columns(3)
-                with position_x_y_defense[0]:
-                    position_key_def = "Position Defense"+ str(i)
-                    position_defense = st.selectbox("Position", ["Position 1", "Position 2", "Position 3"], key = position_key_def)
-                with position_x_y_defense[1]:
-                    x_key_def = "x Defense"+ str(i)
-                    x_defense = st.number_input("Starting X", min_value=0.0, max_value=100.0, step=0.01, format="%f", key = x_key_def)
-                with position_x_y_defense[2]:
-                    y_key_def = "y Defense"+ str(i)
-                    y_defense = st.number_input("Starting Y", min_value=0.0, max_value=100.0, step=0.01, format="%f", key = y_key_def)
-                players.append({
-                    'position': position_defense,
-                    'x': x_defense,
-                    'y': y_defense,
-                    'team' : "defense"
-                })
+        QB_gen = generator(model=model,
+                        tokenizer=tokenizer,
+                        temp = temperature,
+                        n_select = n_select)
     
-    with col2:
-        st.header("Offense")
-        with st.expander("Manually define Offense"):
-            play_type_offense = st.selectbox(f"Play Type Offense", ["Choice 1", "Choice 2", "Choice 3"], key = "playtype_off")
-            for i in range(11):
-                st.subheader(f"Player {i+1}")
-                position_x_y_offense = st.columns(3)
-                with position_x_y_offense[0]:
-                    position_key_off = "Position Offense"+ str(i)
-                    position_offense = st.selectbox("Position", ["Position 1", "Position 2", "Position 3"], key = position_key_off)
-                with position_x_y_offense[1]:
-                    x_key_off = "x Offense"+ str(i)
-                    x_offense = st.number_input("Starting X", min_value=0.0, max_value=100.0, step=0.01, format="%f", key = x_key_off)
-                with position_x_y_offense[2]:
-                    y_key_off = "y Offense"+ str(i)
-                    y_offense = st.number_input("Starting Y", min_value=0.0, max_value=100.0, step=0.01, format="%f", key = y_key_off)
-                players.append({
-                    'position': position_offense,
-                    'x': x_offense,
-                    'y': y_offense,
-                    'team' : "offense"
-                })
-                    
-    fig = go.Figure()
-
-    # Add vertical line at scrimmage line
-    fig.add_shape(
-        go.layout.Shape(
-            type="line",
-            x0=scrimmage_line,
-            x1=scrimmage_line,
-            y0=0,
-            y1=100,
-            line=dict(color="black", width=2)
-        )
-    )
     
-
-    # Add dots for players with different colors for offense and defense
-    for player_data in players:
-        if player_data['team'] == "defense":
-            color = "blue"
-        elif player_data['team'] == "offense":
-            color = "red"
-            
-        fig.add_trace(
-            go.Scatter(
-                x=[player_data['x']],
-                y=[player_data['y']],
-                mode="markers",
-                marker=dict(size=10, color=color),
-                name=f"Position: {player_data['position']}"
-            )
-        )
-
-    fig.update_layout(
-    width=1200,
-    height=600,
-    title="Scrimmage Line and Player Positions",
-    title_font=dict(color="black"),
-    xaxis=dict(title="X Coordinate", range=[-10, 110]),
-    yaxis=dict(title="Y Coordinate", range=[0, 60]),
-    paper_bgcolor="grey",  # Set background color to grey
-    plot_bgcolor="grey",  # Set plot background color to grey
-    xaxis_showgrid=False,  # Remove x-axis grid lines
-    yaxis_showgrid=False,  # Remove y-axis grid lines
-    bargap=0.05  # Adjust the gap between bars
-    )
-
-    st.plotly_chart(fig)
+    selected = filtered_df["index"][0]
+    selection = ref[selected]
     
-def select_players(team_type, team_name):
-    players = []
-    st.header(team_type)
-    with st.expander(f"Select {team_type} Players"):
-        for i in range(11):
-            st.subheader(f"Player {i + 1} - {team_name}")
-            choices = st.columns(1)
-            with choices[0]:
-                choice_key = f"Position {team_type} {i}"
-                choice = st.selectbox("Name, position and jersey number", ["Position 1", "Position 2", "Position 3"], key=choice_key)
-
-            players.append({
-                'position': choice,
-                'team': team_name
-            })
-    return players
+    colc, cold = st.columns(2)
     
-def helenos_page():
-    col1, col2, col3 = st.columns([2, 2, 1])
-    # Input for selecting teams
+    with colc:
+        starts = st.slider("Temperature", 1, 21, 1, step = 1)
+    with cold:
+        frames = st.slider("n select", 1, 50, 20, step = 1)
     
-    with col1:
-        with st.expander("Select Teams"):
-            offense_team = st.text_input("Offense Team Name", "Offense Team")
-            defense_team = st.text_input("Defense Team Name", "Defense Team")
+    if st.button("Generate"):
+        trial_d = QB_gen.tokenizer.truncate_to_time_t(selection, starts)
+        generated = QB_gen.generate_sequence(trial_d, frames)
+        decoded = QB_gen.tokenizer.decode_sequence(generated)
 
-    # Input for down and season
-    with col2:
-        with st.expander("Game Info"):
-            down = st.number_input("Down (1-4)", min_value=1, max_value=4, value=1)
-            season = st.number_input("Season (2017-2022)", min_value=2017, max_value=2022, value=2022)
-            
-    with col3:
-        if st.button("Predict", key="prediction", help="Click to make a prediction.", use_container_width=True):
-            # Add your action for the "Create random play" button here
-            st.write("Make a prediction clicked!")
-            
-    col4, col5 = st.columns(2)
-    # Player selection for Offense
-    with col4:
-        select_players("Offense", offense_team)
+        step1 = QB_gen.prepare_for_plot(decoded)
+        plot = pd.DataFrame(step1)
 
-    # Player selection for Defense
-    with col5:
-        select_players("Defense", defense_team)
+        decoded_true = QB_gen.tokenizer.decode_sequence(selection)
+        step1_true = QB_gen.prepare_for_plot(decoded_true)
+        plot_true = pd.DataFrame(step1_true)
         
-    data = np.random.normal(0, 10, 1000)
+        fig_gen = px.line(plot, x="input_ids_x", y="input_ids_y", animation_frame="pos_ids", color="OffDef", symbol="ids",
+                        text="position_ids", title="Player Trajectories Over Time", line_shape="linear",
+                        range_x=[0, 140], range_y=[0, 60], # Set X and Y axis ranges
+                        render_mode="svg")  # Render mode for smoother lines
+
+        # Customize the appearance of the plot
+        fig_gen.update_traces(marker=dict(size=10), selector=dict(mode='lines'))
+        fig_gen.update_layout(width=800, height=600) 
+        st.plotly_chart(fig_gen)
+        
+        fig_true = px.line(plot_true, x="input_ids_x", y="input_ids_y", animation_frame="pos_ids", color="OffDef", symbol="ids",
+                    text="position_ids", title="Player Trajectories Over Time",
+                    range_x=[0, 140], range_y=[0, 60], # Set X and Y axis ranges
+                    line_shape="linear",  # Draw lines connecting points
+                    render_mode="svg")  # Render mode for smoother lines
+
+        # Customize the appearance of the plot
+        fig_true.update_traces(marker=dict(size=10), selector=dict(mode='lines'))
+        fig_true.update_layout(width=800, height=600) 
+        st.plotly_chart(fig_true)
     
-    col6, sep, col7 = st.columns([4, 1, 3])
+        
+def contacts_and_disclaimers():
     
-    with col6:
-        # Create a histogram plot
-        fig = go.Figure(data=[go.Histogram(x=data)])
-        fig.update_layout(
-            xaxis=dict(title="X Coordinate", range=[-100, 100]),
-            yaxis=dict(title="Count"),
-            title="Yards gained predicted",
-            title_font=dict(color="black"),
-            paper_bgcolor="grey",
-            plot_bgcolor="grey",
-            xaxis_showgrid=False,
-            yaxis_showgrid=False
-        )
-
-        st.plotly_chart(fig)
     
-    with col7:
-        success_prob = np.random.random()
-        fail_prob = 1.0 - success_prob
-
-        pie_fig = go.Figure(data=[go.Pie(labels=["Success", "Fail"], values=[success_prob, fail_prob])])
-        pie_fig.update_layout(
-            title="Success vs. Fail Probability",
-            title_font=dict(color="black")
-        )
-
-        st.plotly_chart(pie_fig)
-
-
-def about_page():
-    # insert widget here
-    
-    st.title("StratAI - Your Football Playbook Powerhouse!")
+    st.title("QB-GPT - Your Football Playbook Powerhouse!")
     
     qb_gpt_text_intro = """
     Are you a data scientist, a machine learning enthusiast, or simply a die-hard NFL fan looking to explore the power of Transformers in the world of American football? Look no further!
@@ -255,28 +118,7 @@ def about_page():
         """
         st.markdown(qb_gpt_act)
         
-    with st.expander("***Helenos: Predicting the outcome of Football Plays***"):
         
-        qb_gpt_hel = """
-        QB-GPT serves as the backbone of our project, Helenos. While QB-GPT excels at play design, Helenos takes it a step further. We combine the learned embeddings from QB-GPT with other critical variables to predict the outcomes of pass and run plays with unprecedented accuracy. It's a game-changer in football analytics. You can compare Helenos to QB-GPT as a sentiment analysis model build upon a Language Model, you first learn how words are jointly connected before understanding a more global sense such as sentiment.
-        
-        It's the ultimate tool for coaches and analysts, helping them make data-driven decisions that can change the course of a game.
-        
-        A more detailed blogpost about the model Helenos can be found [here](link)
-        """
-        st.markdown(qb_gpt_hel)
-        
-    with st.expander("***Join and contacts***"):
-        
-        qb_gpt_join = """
-        Are you passionate about data science, an NFL enthusiast, or simply intrigued by the fusion of technology and sports strategy? There are countless ways to become a part of the QB-GPT and Helenos journey. Whether you're a data scientist eager to explore cutting-edge AI in sports, a football fan wanting to dive into strategic gameplay, or someone who sees the immense potential in this project, there's a place for you. Join us in shaping the future of sports strategy. To get involved, simply reach out and let's connect. 
-        
-        See the contacts in the "Contacts and Disclaimers" section.
-        """
-        st.markdown(qb_gpt_join)
-        
-        
-def contacts_and_disclaimers():
     
     with st.expander("***Author***"):
         col1, col2 = st.columns([4, 1])
