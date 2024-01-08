@@ -178,7 +178,7 @@ class Transformers(tf.keras.Model):
         self.total_dim = num_heads * hidden_dim
         self.output_dim = output_dim
         
-        self.NormIn = tf.keras.layers.LayerNormalization(name = "Norm_in")
+        self.NormIn = tf.keras.layers.LayerNormalization(name = "Norm_in", epsilon=0.0001)
         self.Query = tf.keras.layers.Dense(self.total_dim, name = "Query", use_bias = False)
         self.Key = tf.keras.layers.Dense(self.total_dim, name = "Key", use_bias = False)
         self.Value = tf.keras.layers.Dense(self.total_dim, name = "Value", use_bias = False)
@@ -189,7 +189,7 @@ class Transformers(tf.keras.Model):
         self.Drop = tf.keras.layers.Dropout(rate = 0.1)
         
         self.DenseOut = tf.keras.layers.Dense(output_dim, name = "Dense", activation = "relu")
-        self.NormOut = tf.keras.layers.LayerNormalization(name = "Norm_out")
+        self.NormOut = tf.keras.layers.LayerNormalization(name = "Norm_out", epsilon=0.0001)
 
   def transpose_for_scores(self, tensor: tf.Tensor, batch_size: int) -> tf.Tensor:
         # Reshape from [batch_size, seq_length, all_head_size] to [batch_size, seq_length, num_attention_heads, attention_head_size]
@@ -331,7 +331,6 @@ class Encoder(tf.keras.Model):
 
     embed = self.Embedding(x)
     h1 = self.Attention1(embed, x["pos_ids"], x["attention_mask"])
-
     encoded = self.DenseHead(h1)
 
     return encoded
